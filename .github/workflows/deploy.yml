@@ -1,4 +1,4 @@
-name: Deploy to EC2
+name: Deploy NSCC Frontend
 
 on:
   push:
@@ -8,16 +8,42 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # Step 1: Clean target folder via SSH
+      - name: Clean target folder on EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            echo "Cleaning /usr/share/nginx/html/nscc-frontend"
+            sudo rm -rf /usr/share/nginx/html/nscc-frontend/*
+            sudo mkdir -p /usr/share/nginx/html/nscc-frontend
+            sudo chown -R ec2-user:ec2-user /usr/share/nginx/html/nscc-frontend
+
+      # Step 2: Copy files to EC2 (without rm)
       - name: Copy files to EC2
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "./*" # <-- copies everything in nscc-frontend folder
+          source: "./*" # all files in repo root
           target: "/usr/share/nginx/html/nscc-frontend"
-          rm: true # remove existing files first
+          rm: false # don't try to remove folder
+
+      # Step 3 (optional): Restart Nginx if needed
+      - name: Restart Nginx
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            sudo systemctl restart nginx
+            echo "Nginx restarted successfully"
