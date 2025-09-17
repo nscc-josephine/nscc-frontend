@@ -1,4 +1,4 @@
-name: Deploy NSCC Frontend
+name: Deploy to EC2
 
 on:
   push:
@@ -8,27 +8,16 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Copy files via SCP
+      - name: Copy files to EC2
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          source: "*" # copy everything from repo root
+          source: "./*" # <-- copies everything in nscc-frontend folder
           target: "/usr/share/nginx/html/nscc-frontend"
-          rm: true # remove existing files before copying
-
-      - name: Restart Nginx
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            sudo systemctl restart nginx
+          rm: true # remove existing files first
