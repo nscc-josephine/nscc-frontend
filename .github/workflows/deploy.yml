@@ -7,43 +7,27 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted # your EC2-A runner
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 1: Clean target folder via SSH
-      - name: Clean target folder on EC2
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            echo "Cleaning /usr/share/nginx/html/nscc-frontend"
-            sudo rm -rf /usr/share/nginx/html/nscc-frontend/*
-            sudo mkdir -p /usr/share/nginx/html/nscc-frontend
-            sudo chown -R ec2-user:ec2-user /usr/share/nginx/html/nscc-frontend
+      # Step 1: Clean target folder on EC2-B
+      - name: Clean target folder on EC2-B
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new ec2-user@10.15.1.87 "\
+            sudo rm -rf /usr/share/nginx/html/nscc-frontend/* && \
+            sudo mkdir -p /usr/share/nginx/html/nscc-frontend && \
+            sudo chown -R ec2-user:ec2-user /usr/share/nginx/html/nscc-frontend \
+          "
 
-      # Step 2: Copy files to EC2 (without rm)
-      - name: Copy files to EC2
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "./*" # all files in repo root
-          target: "/usr/share/nginx/html/nscc-frontend"
-          rm: false # don't try to remove folder
+      # Step 2: Copy files to EC2-B
+      - name: Copy files to EC2-B
+        run: |
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new -r ./* ec2-user@10.15.1.87:/usr/share/nginx/html/nscc-frontend/
 
-      # Step 3 (optional): Restart Nginx if needed
+      # Step 3: Restart Nginx on EC2-B
       - name: Restart Nginx
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            sudo systemctl restart nginx
-            echo "Nginx restarted successfully"
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new ec2-user@10.15.1.87 "sudo systemctl restart nginx && echo 'Nginx restarted successfully'"
